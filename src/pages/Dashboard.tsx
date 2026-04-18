@@ -9,8 +9,6 @@ import { db, PersonRecord, uuid } from "@/lib/db";
 import { useLoom } from "@/context/LoomContext";
 import { broadcastSOS } from "@/lib/sos";
 import { toast } from "sonner";
-import { useLiveQuery } from "dexie-react-hooks-lite-stub";
-
 // Light shim for live data — Dexie's reactive hook isn't included to avoid extra deps.
 function usePeople(): PersonRecord[] {
   const [people, setPeople] = useState<PersonRecord[]>([]);
