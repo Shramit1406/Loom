@@ -1,3 +1,4 @@
+/// <reference types="google.maps" />
 import { useEffect } from "react";
 import { APIProvider, Map, AdvancedMarker, Pin, useMap } from "@vis.gl/react-google-maps";
 import { AlertTriangle, MapPin } from "lucide-react";
