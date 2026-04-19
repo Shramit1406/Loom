@@ -22,24 +22,60 @@ export interface LiveLocation {
   updatedAt: string;
 }
 
+export interface SafeZone {
+  lat: number;
+  lng: number;
+  radiusM: number;
+  label?: string;
+  setAt: string;
+}
+
+export interface SoothingMessage {
+  id: string;
+  audioDataUrl: string; // base64 data URL so it survives across tabs
+  recordedAt: string;
+  caregiverName?: string;
+}
+
+export interface GeofenceAlert {
+  id: string;
+  patientName: string;
+  at: string;
+  distanceM: number;
+  location: LiveLocation;
+}
+
 export interface SharedState {
   pairing: PairingRecord | null;
   patientLocation: LiveLocation | null;
   caregiverLocation: LiveLocation | null;
   // Patient -> caregiver SOS signal
   sos: { id: string; patientName: string; at: string; location: LiveLocation | null } | null;
+  safeZone: SafeZone | null;
+  soothing: SoothingMessage | null;
+  geofenceAlert: GeofenceAlert | null;
 }
 
 const KEY = "loom.shared.v1";
 const CH = "loom.shared.channel.v1";
 
+const EMPTY: SharedState = {
+  pairing: null,
+  patientLocation: null,
+  caregiverLocation: null,
+  sos: null,
+  safeZone: null,
+  soothing: null,
+  geofenceAlert: null,
+};
+
 function read(): SharedState {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { pairing: null, patientLocation: null, caregiverLocation: null, sos: null };
-    return JSON.parse(raw) as SharedState;
+    if (!raw) return { ...EMPTY };
+    return { ...EMPTY, ...(JSON.parse(raw) as Partial<SharedState>) };
   } catch {
-    return { pairing: null, patientLocation: null, caregiverLocation: null, sos: null };
+    return { ...EMPTY };
   }
 }
 
@@ -68,7 +104,6 @@ export function subscribeShared(cb: (s: SharedState) => void): () => void {
     if (e.key === KEY) cb(read());
   };
   window.addEventListener("storage", onStorage);
-  // initial
   cb(read());
   return () => {
     ch.removeEventListener("message", onMsg);
@@ -105,7 +140,7 @@ export function acceptPairing(code: string, caregiverName: string): PairingRecor
 }
 
 export function clearPairing() {
-  write({ pairing: null, patientLocation: null, caregiverLocation: null, sos: null });
+  write({ ...EMPTY });
 }
 
 export function publishLocation(role: "patient" | "caregiver", loc: LiveLocation) {
@@ -126,3 +161,44 @@ export function clearSOS() {
   const s = read();
   write({ ...s, sos: null });
 }
+
+export function setSafeZone(z: SafeZone | null) {
+  const s = read();
+  write({ ...s, safeZone: z, geofenceAlert: null });
+}
+
+export function setSoothingMessage(m: SoothingMessage | null) {
+  const s = read();
+  write({ ...s, soothing: m });
+}
+
+export function pushGeofenceAlert(a: GeofenceAlert) {
+  const s = read();
+  write({ ...s, geofenceAlert: a });
+}
+
+export function clearGeofenceAlert() {
+  const s = read();
+  write({ ...s, geofenceAlert: null });
+}
+
+export function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+export async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
