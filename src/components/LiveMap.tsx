@@ -1,4 +1,5 @@
-import { APIProvider, Map, AdvancedMarker, Pin } from "@vis.gl/react-google-maps";
+import { useEffect } from "react";
+import { APIProvider, Map, AdvancedMarker, Pin, useMap } from "@vis.gl/react-google-maps";
 import { AlertTriangle, MapPin } from "lucide-react";
 
 interface MarkerSpec {
@@ -9,16 +10,43 @@ interface MarkerSpec {
   tone: "patient" | "caregiver" | "sos";
 }
 
+interface SafeZoneSpec {
+  lat: number;
+  lng: number;
+  radiusM: number;
+}
+
 interface LiveMapProps {
   markers: MarkerSpec[];
   center?: { lat: number; lng: number };
   zoom?: number;
+  safeZone?: SafeZoneSpec | null;
+  outsideZone?: boolean;
 }
 
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
-const MAP_ID = "loom-map"; // any string works for AdvancedMarker
+const MAP_ID = "loom-map";
 
-export default function LiveMap({ markers, center, zoom = 14 }: LiveMapProps) {
+function SafeZoneCircle({ zone, breached }: { zone: SafeZoneSpec; breached: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || typeof google === "undefined") return;
+    const circle = new google.maps.Circle({
+      map,
+      center: { lat: zone.lat, lng: zone.lng },
+      radius: zone.radiusM,
+      strokeColor: breached ? "#ef4444" : "#A855F7",
+      strokeOpacity: 0.9,
+      strokeWeight: 2,
+      fillColor: breached ? "#ef4444" : "#A855F7",
+      fillOpacity: 0.12,
+    });
+    return () => circle.setMap(null);
+  }, [map, zone.lat, zone.lng, zone.radiusM, breached]);
+  return null;
+}
+
+export default function LiveMap({ markers, center, zoom = 14, safeZone, outsideZone }: LiveMapProps) {
   if (!KEY) {
     return (
       <div className="loom-card flex flex-col items-center text-center p-8 gap-3">
@@ -29,7 +57,7 @@ export default function LiveMap({ markers, center, zoom = 14 }: LiveMapProps) {
         <p className="text-sm text-foreground/70 max-w-md">
           Add your Google Maps JavaScript API key as the env variable{" "}
           <code className="px-1.5 py-0.5 rounded bg-muted text-xs">VITE_GOOGLE_MAPS_API_KEY</code>{" "}
-          to enable the live map. In the meantime, locations are still shared between patient and caregiver below.
+          to enable the live map.
         </p>
         <ul className="mt-2 w-full max-w-sm text-left text-sm">
           {markers.map((m) => (
@@ -47,7 +75,7 @@ export default function LiveMap({ markers, center, zoom = 14 }: LiveMapProps) {
     );
   }
 
-  const c = center ?? markers[0] ?? { lat: 37.7749, lng: -122.4194 };
+  const c = center ?? markers[0] ?? (safeZone ? { lat: safeZone.lat, lng: safeZone.lng } : { lat: 37.7749, lng: -122.4194 });
 
   return (
     <div className="rounded-3xl overflow-hidden shadow-card h-[420px] bg-muted">
@@ -61,13 +89,15 @@ export default function LiveMap({ markers, center, zoom = 14 }: LiveMapProps) {
         >
           {markers.map((m) => (
             <AdvancedMarker key={m.id} position={{ lat: m.lat, lng: m.lng }} title={m.label}>
-              <Pin
-                background={pinBg(m.tone)}
-                borderColor="#ffffff"
-                glyphColor="#ffffff"
-              />
+              <Pin background={pinBg(m.tone)} borderColor="#ffffff" glyphColor="#ffffff" />
             </AdvancedMarker>
           ))}
+          {safeZone && <SafeZoneCircle zone={safeZone} breached={!!outsideZone} />}
+          {safeZone && (
+            <AdvancedMarker position={{ lat: safeZone.lat, lng: safeZone.lng }} title="Safe zone center">
+              <Pin background="#22c55e" borderColor="#ffffff" glyphColor="#ffffff" />
+            </AdvancedMarker>
+          )}
         </Map>
       </APIProvider>
     </div>
