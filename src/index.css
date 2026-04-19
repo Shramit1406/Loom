@@ -2,68 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Loom Design System
+/* Loom Design System — Electric Violet
    Light, calming, elderly-friendly. All colors HSL.
-   Sage / Peach / Lavender on cream.
+   Vibrant violet primary, soft lavender secondary, deep purple accent.
 */
 
 @layer base {
   :root {
     /* Brand */
     --background: 50 71% 98%;        /* #FFFDF5 cream */
-    --foreground: 210 29% 24%;       /* #2C3E50 dark gray */
+    --foreground: 260 35% 18%;       /* deep plum-ink */
 
     --card: 0 0% 100%;
-    --card-foreground: 210 29% 24%;
+    --card-foreground: 260 35% 18%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 210 29% 24%;
+    --popover-foreground: 260 35% 18%;
 
-    --primary: 120 25% 65%;          /* sage #8FBC8F */
+    --primary: 271 91% 65%;          /* #A855F7 vibrant violet */
     --primary-foreground: 0 0% 100%;
-    --primary-soft: 120 30% 88%;
+    --primary-soft: 270 100% 95%;    /* very pale violet */
 
-    --secondary: 28 100% 86%;        /* peach #FFDAB9 */
-    --secondary-foreground: 210 29% 24%;
-    --secondary-soft: 28 100% 94%;
+    --secondary: 270 100% 95%;       /* #F3E8FF soft lavender */
+    --secondary-foreground: 260 35% 18%;
+    --secondary-soft: 280 100% 97%;
 
-    --accent: 240 67% 94%;           /* lavender #E6E6FA */
-    --accent-foreground: 210 29% 24%;
-    --accent-soft: 240 67% 97%;
+    --accent: 263 70% 50%;           /* #6D28D9 deep purple */
+    --accent-foreground: 0 0% 100%;
+    --accent-soft: 270 100% 95%;
 
-    --muted: 50 30% 95%;
-    --muted-foreground: 210 15% 45%;
+    --muted: 270 30% 96%;
+    --muted-foreground: 260 15% 45%;
 
-    --destructive: 0 70% 60%;
+    --destructive: 350 85% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 50 20% 90%;
-    --input: 50 20% 90%;
-    --ring: 120 25% 65%;
+    --border: 270 30% 90%;
+    --input: 270 30% 90%;
+    --ring: 271 91% 65%;
 
-    --radius: 1.5rem;                /* 24px - soft cards */
+    --radius: 1.5rem;
 
-    /* Gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(120 30% 92%) 0%, hsl(28 100% 92%) 50%, hsl(240 67% 95%) 100%);
-    --gradient-sage: linear-gradient(135deg, hsl(120 30% 80%), hsl(120 25% 65%));
-    --gradient-peach: linear-gradient(135deg, hsl(28 100% 90%), hsl(28 90% 78%));
-    --gradient-lavender: linear-gradient(135deg, hsl(240 67% 95%), hsl(260 50% 85%));
-    --gradient-calm: linear-gradient(135deg, hsl(120 25% 75%), hsl(28 80% 80%));
+    /* Gradients — kept legacy class names, repointed to purple */
+    --gradient-hero: linear-gradient(135deg, hsl(270 100% 96%) 0%, hsl(285 100% 94%) 50%, hsl(263 80% 90%) 100%);
+    --gradient-sage: linear-gradient(135deg, hsl(271 91% 72%), hsl(263 70% 50%));      /* primary action */
+    --gradient-peach: linear-gradient(135deg, hsl(285 100% 92%), hsl(320 90% 85%));    /* warm panic - magenta tinted */
+    --gradient-lavender: linear-gradient(135deg, hsl(270 100% 95%), hsl(263 80% 80%));
+    --gradient-calm: linear-gradient(135deg, hsl(271 91% 75%), hsl(295 80% 80%));
 
     /* Shadows */
-    --shadow-soft: 0 4px 24px -8px hsl(120 25% 65% / 0.15);
-    --shadow-card: 0 8px 32px -12px hsl(210 29% 24% / 0.10);
-    --shadow-glow: 0 0 40px hsl(28 100% 86% / 0.5);
+    --shadow-soft: 0 4px 24px -8px hsl(271 91% 65% / 0.25);
+    --shadow-card: 0 8px 32px -12px hsl(263 70% 30% / 0.15);
+    --shadow-glow: 0 0 40px hsl(271 91% 65% / 0.45);
 
     /* Sidebar (kept for shadcn) */
     --sidebar-background: 50 71% 98%;
-    --sidebar-foreground: 210 29% 24%;
-    --sidebar-primary: 120 25% 65%;
+    --sidebar-foreground: 260 35% 18%;
+    --sidebar-primary: 271 91% 65%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 67% 94%;
-    --sidebar-accent-foreground: 210 29% 24%;
-    --sidebar-border: 50 20% 90%;
-    --sidebar-ring: 120 25% 65%;
+    --sidebar-accent: 270 100% 95%;
+    --sidebar-accent-foreground: 260 35% 18%;
+    --sidebar-border: 270 30% 90%;
+    --sidebar-ring: 271 91% 65%;
   }
 }
 
@@ -72,7 +72,7 @@
     @apply border-border;
   }
   html {
-    font-size: 18px;            /* elderly-friendly base */
+    font-size: 18px;
   }
   body {
     @apply bg-background text-foreground;
@@ -111,8 +111,8 @@
     animation: pulse-soft 2.4s ease-in-out infinite;
   }
   @keyframes pulse-soft {
-    0%, 100% { box-shadow: 0 0 0 0 hsl(28 100% 78% / 0.6); }
-    50%      { box-shadow: 0 0 0 24px hsl(28 100% 78% / 0); }
+    0%, 100% { box-shadow: 0 0 0 0 hsl(271 91% 65% / 0.55); }
+    50%      { box-shadow: 0 0 0 24px hsl(271 91% 65% / 0); }
   }
   .animate-float {
     animation: float 6s ease-in-out infinite;
