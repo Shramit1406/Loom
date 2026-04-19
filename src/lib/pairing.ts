@@ -22,12 +22,38 @@ export interface LiveLocation {
   updatedAt: string;
 }
 
+export interface SafeZone {
+  lat: number;
+  lng: number;
+  radiusM: number;
+  label?: string;
+  setAt: string;
+}
+
+export interface SoothingMessage {
+  id: string;
+  audioDataUrl: string; // base64 data URL so it survives across tabs
+  recordedAt: string;
+  caregiverName?: string;
+}
+
+export interface GeofenceAlert {
+  id: string;
+  patientName: string;
+  at: string;
+  distanceM: number;
+  location: LiveLocation;
+}
+
 export interface SharedState {
   pairing: PairingRecord | null;
   patientLocation: LiveLocation | null;
   caregiverLocation: LiveLocation | null;
   // Patient -> caregiver SOS signal
   sos: { id: string; patientName: string; at: string; location: LiveLocation | null } | null;
+  safeZone: SafeZone | null;
+  soothing: SoothingMessage | null;
+  geofenceAlert: GeofenceAlert | null;
 }
 
 const KEY = "loom.shared.v1";
