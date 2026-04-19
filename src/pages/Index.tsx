@@ -25,6 +25,7 @@ const Index = () => {
         <div className="hidden sm:flex items-center gap-8 text-base">
           <a href="#features" className="text-foreground/70 hover:text-foreground">Features</a>
           <a href="#how" className="text-foreground/70 hover:text-foreground">How it works</a>
+          <Link to="/caregiver-app" className="text-foreground/70 hover:text-foreground">Caregiver app</Link>
         </div>
         <Link to={ctaTo}>
           <Button className="loom-tap rounded-full h-11 px-5 gradient-sage text-white shadow-soft hover:shadow-glow">
