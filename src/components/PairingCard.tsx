@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
-import { Copy, Link2, Check, MapPin, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Copy, Link2, Check, MapPin, X, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   clearPairing,
+  distanceMeters,
   generatePairingCode,
   getShared,
   publishLocation,
+  pushGeofenceAlert,
   SharedState,
   subscribeShared,
 } from "@/lib/pairing";
@@ -20,6 +22,9 @@ export default function PairingCard({ patientName }: Props) {
   const [shared, setShared] = useState<SharedState>(getShared());
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const lastBreachRef = useRef<boolean>(false);
+  const lastSoothingId = useRef<string | null>(null);
+  const lastSosId = useRef<string | null>(null);
 
   useEffect(() => subscribeShared(setShared), []);
 
@@ -42,12 +47,42 @@ export default function PairingCard({ patientName }: Props) {
     return () => navigator.geolocation.clearWatch(id);
   }, [paired]);
 
+  // Geofence: when patient leaves the safe zone, publish an alert (caregiver picks it up)
+  useEffect(() => {
+    if (!shared.safeZone || !shared.patientLocation) return;
+    const d = distanceMeters(shared.patientLocation, shared.safeZone);
+    const outside = d > shared.safeZone.radiusM;
+    if (outside && !lastBreachRef.current) {
+      pushGeofenceAlert({
+        id: crypto.randomUUID(),
+        patientName,
+        at: new Date().toISOString(),
+        distanceM: Math.round(d),
+        location: shared.patientLocation,
+      });
+    }
+    lastBreachRef.current = outside;
+  }, [shared.safeZone, shared.patientLocation, patientName]);
+
+  // Auto-play caregiver's soothing message whenever a new SOS is fired from this patient
+  useEffect(() => {
+    if (!shared.sos) return;
+    if (shared.sos.id === lastSosId.current) return;
+    lastSosId.current = shared.sos.id;
+    if (shared.soothing && shared.soothing.id !== lastSoothingId.current) {
+      try {
+        const a = new Audio(shared.soothing.audioDataUrl);
+        a.play().catch(() => {});
+        lastSoothingId.current = shared.soothing.id;
+      } catch {/* ignore */}
+    }
+  }, [shared.sos, shared.soothing]);
+
   const generate = async () => {
     setGenerating(true);
-    const r = generatePairingCode(patientName);
+    generatePairingCode(patientName);
     setGenerating(false);
     toast.success("Code ready", { description: "Share it with your caregiver." });
-    return r;
   };
 
   const copy = async () => {
@@ -63,7 +98,12 @@ export default function PairingCard({ patientName }: Props) {
     toast.success("Caregiver disconnected");
   };
 
-  // Not yet generated
+  const playSoothing = () => {
+    if (!shared.soothing) return;
+    const a = new Audio(shared.soothing.audioDataUrl);
+    a.play().catch(() => {});
+  };
+
   if (!shared.pairing) {
     return (
       <div className="loom-card flex items-center gap-4">
@@ -81,7 +121,6 @@ export default function PairingCard({ patientName }: Props) {
     );
   }
 
-  // Generated, awaiting caregiver
   if (!shared.pairing.acceptedAt) {
     return (
       <div className="loom-card">
@@ -119,7 +158,6 @@ export default function PairingCard({ patientName }: Props) {
     );
   }
 
-  // Paired — show caregiver, plus their location during SOS
   const showCaregiverLoc = !!shared.sos && shared.caregiverLocation;
   return (
     <div className="loom-card">
@@ -139,6 +177,25 @@ export default function PairingCard({ patientName }: Props) {
           Disconnect
         </Button>
       </div>
+
+      {shared.soothing && (
+        <div className="mt-4 rounded-2xl bg-secondary p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-card flex items-center justify-center">
+            <Volume2 className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold">
+              A message from {shared.soothing.caregiverName ?? shared.pairing.caregiverName}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Plays automatically if you tap "I'm feeling confused".
+            </div>
+          </div>
+          <Button onClick={playSoothing} variant="outline" className="rounded-full border-2">
+            Play
+          </Button>
+        </div>
+      )}
 
       {showCaregiverLoc && (
         <div className="mt-4 rounded-2xl bg-secondary p-4 flex items-center gap-3">
