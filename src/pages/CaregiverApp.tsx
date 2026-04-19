@@ -1,17 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, ShieldCheck, Link2, MapPin, Bell, BellRing, LogOut, Heart } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Link2, MapPin, BellRing, LogOut, Heart, Shield, Mic, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import LoomLogo from "@/components/LoomLogo";
 import LiveMap from "@/components/LiveMap";
+import AudioRecorder from "@/components/AudioRecorder";
 import {
   acceptPairing,
+  blobToDataUrl,
+  clearGeofenceAlert,
   clearPairing,
   clearSOS,
+  distanceMeters,
   getShared,
   publishLocation,
+  setSafeZone,
+  setSoothingMessage,
   SharedState,
   subscribeShared,
 } from "@/lib/pairing";
@@ -21,6 +28,8 @@ const CaregiverApp = () => {
   const [shared, setShared] = useState<SharedState>(getShared());
   const [name, setName] = useState(localStorage.getItem("loom.caregiver.name") ?? "");
   const [code, setCode] = useState("");
+  const [radius, setRadius] = useState<number>(shared.safeZone?.radiusM ?? 200);
+  const [showRecorder, setShowRecorder] = useState(false);
   const watchIdRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -28,8 +37,12 @@ const CaregiverApp = () => {
     return unsub;
   }, []);
 
-  // Stream caregiver location once paired
+  useEffect(() => {
+    if (shared.safeZone) setRadius(shared.safeZone.radiusM);
+  }, [shared.safeZone]);
+
   const paired = !!shared.pairing?.acceptedAt && shared.pairing?.caregiverName === (name || shared.pairing?.caregiverName);
+
   useEffect(() => {
     if (!paired) return;
     if (!("geolocation" in navigator)) {
@@ -45,9 +58,7 @@ const CaregiverApp = () => {
           updatedAt: new Date().toISOString(),
         });
       },
-      (err) => {
-        console.warn("caregiver geo error", err);
-      },
+      (err) => console.warn("caregiver geo error", err),
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
     );
     watchIdRef.current = id;
@@ -62,10 +73,9 @@ const CaregiverApp = () => {
     if (shared.sos && shared.sos.id !== lastSosId.current) {
       lastSosId.current = shared.sos.id;
       toast.error(`${shared.sos.patientName} needs reassurance`, {
-        description: "Tap to view their live location.",
+        description: shared.soothing ? "Your soothing message is auto-playing on their device." : "Tap to view their live location.",
         duration: 8000,
       });
-      // gentle audible cue
       try {
         const ctx = new AudioContext();
         const o = ctx.createOscillator();
@@ -77,7 +87,19 @@ const CaregiverApp = () => {
         setTimeout(() => { o.stop(); ctx.close(); }, 350);
       } catch { /* ignore */ }
     }
-  }, [shared.sos]);
+  }, [shared.sos, shared.soothing]);
+
+  // Geofence alert toast
+  const lastFenceId = useRef<string | null>(null);
+  useEffect(() => {
+    if (shared.geofenceAlert && shared.geofenceAlert.id !== lastFenceId.current) {
+      lastFenceId.current = shared.geofenceAlert.id;
+      toast.error(`${shared.geofenceAlert.patientName} left the safe zone`, {
+        description: `${shared.geofenceAlert.distanceM} m from home · ${new Date(shared.geofenceAlert.at).toLocaleTimeString()}`,
+        duration: 10000,
+      });
+    }
+  }, [shared.geofenceAlert]);
 
   const tryPair = () => {
     if (!name.trim()) return toast.error("Enter your name first");
@@ -92,6 +114,71 @@ const CaregiverApp = () => {
     if (!confirm("Unpair from this patient? Their location will stop being shared.")) return;
     clearPairing();
     toast.success("Unpaired");
+  };
+
+  const setHomeHere = () => {
+    if (!("geolocation" in navigator)) return toast.error("Geolocation not supported");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setSafeZone({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          radiusM: radius,
+          label: "Home",
+          setAt: new Date().toISOString(),
+        });
+        toast.success("Safe zone set to your current location");
+      },
+      () => toast.error("Could not read your location"),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const setHomeFromPatient = () => {
+    if (!shared.patientLocation) return toast.error("Waiting for patient location…");
+    setSafeZone({
+      lat: shared.patientLocation.lat,
+      lng: shared.patientLocation.lng,
+      radiusM: radius,
+      label: "Home",
+      setAt: new Date().toISOString(),
+    });
+    toast.success("Safe zone set to patient's current location");
+  };
+
+  const updateRadius = (v: number[]) => {
+    const r = v[0];
+    setRadius(r);
+    if (shared.safeZone) {
+      setSafeZone({ ...shared.safeZone, radiusM: r });
+    }
+  };
+
+  const removeZone = () => {
+    setSafeZone(null);
+    toast.success("Safe zone removed");
+  };
+
+  const onSoothingRecorded = async (b: Blob | null) => {
+    if (!b) {
+      setSoothingMessage(null);
+      setShowRecorder(false);
+      return;
+    }
+    const dataUrl = await blobToDataUrl(b);
+    setSoothingMessage({
+      id: crypto.randomUUID(),
+      audioDataUrl: dataUrl,
+      recordedAt: new Date().toISOString(),
+      caregiverName: name || shared.pairing?.caregiverName,
+    });
+    toast.success("Soothing message saved", { description: "It will auto-play on the patient's device during SOS." });
+    setShowRecorder(false);
+  };
+
+  const removeSoothing = () => {
+    setSoothingMessage(null);
+    toast.success("Soothing message removed");
   };
 
   const markers: { id: string; lat: number; lng: number; label: string; tone: "patient" | "caregiver" | "sos" }[] = [];
@@ -114,6 +201,10 @@ const CaregiverApp = () => {
     });
   }
 
+  const outsideZone =
+    !!(shared.safeZone && shared.patientLocation &&
+      distanceMeters(shared.patientLocation, shared.safeZone) > shared.safeZone.radiusM);
+
   return (
     <main className="min-h-screen bg-background pb-24">
       <header className="container pt-6 pb-4 flex items-center justify-between">
@@ -132,9 +223,33 @@ const CaregiverApp = () => {
         </h1>
         <p className="text-foreground/70 mt-2">
           {paired
-            ? "You'll see their live location and be alerted the moment they need reassurance."
+            ? "You'll see their live location, get geofence alerts, and your recorded message will comfort them on SOS."
             : "Ask the patient to open Loom → Dashboard → 'Connect a caregiver' and share the 6-digit code."}
         </p>
+
+        {/* Geofence breach banner */}
+        {shared.geofenceAlert && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-6 loom-card flex items-center gap-4 border-2 border-destructive/40 bg-destructive/5"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-destructive/15 flex items-center justify-center">
+              <Shield className="w-6 h-6 text-destructive" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-destructive">
+                {shared.geofenceAlert.patientName} left the safe zone
+              </div>
+              <div className="text-sm text-foreground/70">
+                {shared.geofenceAlert.distanceM} m from home · {new Date(shared.geofenceAlert.at).toLocaleTimeString()}
+              </div>
+            </div>
+            <Button variant="ghost" onClick={() => clearGeofenceAlert()} className="rounded-full">
+              Acknowledge
+            </Button>
+          </motion.div>
+        )}
 
         {/* SOS banner */}
         {shared.sos && (
@@ -150,6 +265,7 @@ const CaregiverApp = () => {
               <div className="font-semibold text-destructive">SOS from {shared.sos.patientName}</div>
               <div className="text-sm text-foreground/70">
                 {new Date(shared.sos.at).toLocaleTimeString()} · {shared.sos.location ? "Location attached" : "No location"}
+                {shared.soothing ? " · Soothing message playing on patient device" : ""}
               </div>
             </div>
             <Button variant="ghost" onClick={() => clearSOS()} className="rounded-full">
@@ -202,7 +318,87 @@ const CaregiverApp = () => {
                   : "Waiting for patient location…"}
               </span>
             </div>
-            <LiveMap markers={markers} />
+            <LiveMap markers={markers} safeZone={shared.safeZone} outsideZone={outsideZone} />
+
+            {/* Safe zone controls */}
+            <div className="loom-card mt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Shield className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-semibold">Safe zone</h3>
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {shared.safeZone
+                    ? `Center ${shared.safeZone.lat.toFixed(4)}, ${shared.safeZone.lng.toFixed(4)} · ${shared.safeZone.radiusM}m`
+                    : "Not set"}
+                </span>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-foreground/70">Radius</span>
+                    <span className="font-semibold">{radius} m</span>
+                  </div>
+                  <Slider value={[radius]} min={50} max={2000} step={10} onValueChange={updateRadius} className="mt-2" />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={setHomeHere} className="rounded-full gradient-sage text-white h-11">
+                    Use my location as home
+                  </Button>
+                  <Button onClick={setHomeFromPatient} variant="outline" className="rounded-full border-2 h-11">
+                    Use patient's current location
+                  </Button>
+                  {shared.safeZone && (
+                    <Button onClick={removeZone} variant="ghost" className="rounded-full h-11 text-destructive hover:bg-destructive/10">
+                      <Trash2 className="w-4 h-4 mr-1" /> Remove zone
+                    </Button>
+                  )}
+                </div>
+                {outsideZone && (
+                  <p className="text-sm text-destructive">⚠ Patient is currently outside the safe zone.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Soothing message */}
+            <div className="loom-card mt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Mic className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-semibold">Soothing voice message</h3>
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {shared.soothing ? `Recorded ${timeAgo(shared.soothing.recordedAt)}` : "Not recorded"}
+                </span>
+              </div>
+              <p className="text-sm text-foreground/70 mb-3">
+                Auto-plays on {shared.pairing?.patientName ?? "the patient"}'s device whenever they tap the panic button.
+              </p>
+              {showRecorder || !shared.soothing ? (
+                <AudioRecorder
+                  initialBlob={null}
+                  onRecordingComplete={onSoothingRecorded}
+                  promptText={`Hi ${shared.pairing?.patientName ?? ""}, you are safe. I love you. I'll be there soon.`}
+                  maxDuration={30}
+                />
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => {
+                      const a = new Audio(shared.soothing!.audioDataUrl);
+                      a.play().catch(() => {});
+                    }}
+                    variant="outline"
+                    className="rounded-full border-2 h-11"
+                  >
+                    Play preview
+                  </Button>
+                  <Button onClick={() => setShowRecorder(true)} className="rounded-full gradient-sage text-white h-11">
+                    <Mic className="w-4 h-4 mr-2" /> Re-record
+                  </Button>
+                  <Button onClick={removeSoothing} variant="ghost" className="rounded-full h-11 text-destructive hover:bg-destructive/10">
+                    <Trash2 className="w-4 h-4 mr-1" /> Remove
+                  </Button>
+                </div>
+              )}
+            </div>
+
             <div className="grid sm:grid-cols-2 gap-3 mt-4">
               <Link to="/caregiver">
                 <Button variant="outline" className="rounded-full border-2 h-12 w-full">
