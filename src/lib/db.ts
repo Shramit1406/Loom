@@ -13,7 +13,7 @@ export interface PersonRecord {
   relationship: string;
   imageBlob: Blob;
   voiceNoteBlob: Blob | null;
-  faceDescriptor?: number[]; // serialized Float32Array
+  faceDescriptor?: number[];
   createdAt: string;
 }
 
@@ -22,12 +22,21 @@ export interface PanicEvent {
   timestamp: string;
   triggeredBy: "manual" | "auto";
   note?: string;
+  patientLocation?: { lat: number; lng: number } | null;
+}
+
+export interface RecognitionEvent {
+  id: string;
+  personId: string;
+  personName: string;
+  timestamp: string;
 }
 
 class LoomDatabase extends Dexie {
   userProfile!: Table<UserProfile, string>;
   people!: Table<PersonRecord, string>;
   panicEvents!: Table<PanicEvent, string>;
+  recognitions!: Table<RecognitionEvent, string>;
 
   constructor() {
     super("LoomDatabase");
@@ -35,6 +44,12 @@ class LoomDatabase extends Dexie {
       userProfile: "id",
       people: "id, name, relationship, createdAt",
       panicEvents: "id, timestamp",
+    });
+    this.version(2).stores({
+      userProfile: "id",
+      people: "id, name, relationship, createdAt",
+      panicEvents: "id, timestamp",
+      recognitions: "id, personId, timestamp",
     });
   }
 }

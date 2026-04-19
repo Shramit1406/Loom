@@ -9,6 +9,7 @@ import { db, PersonRecord, uuid } from "@/lib/db";
 import { useLoom } from "@/context/LoomContext";
 import { broadcastSOS } from "@/lib/sos";
 import { toast } from "sonner";
+import PairingCard from "@/components/PairingCard";
 // Light shim for live data — Dexie's reactive hook isn't included to avoid extra deps.
 function usePeople(): PersonRecord[] {
   const [people, setPeople] = useState<PersonRecord[]>([]);
@@ -116,6 +117,11 @@ const Dashboard = () => {
             <div className="text-sm text-foreground/60">Photo + voice note</div>
           </div>
         </Link>
+      </section>
+
+      {/* Caregiver pairing */}
+      <section className="container mt-6">
+        <PairingCard patientName={profile?.name ?? "Patient"} />
       </section>
 
       {/* People */}

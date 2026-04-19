@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard.tsx";
 import AddPerson from "./pages/AddPerson.tsx";
 import CameraView from "./pages/CameraView.tsx";
 import Caregiver from "./pages/Caregiver.tsx";
+import CaregiverApp from "./pages/CaregiverApp.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/add-person" element={<AddPerson />} />
             <Route path="/camera" element={<CameraView />} />
             <Route path="/caregiver" element={<Caregiver />} />
+            <Route path="/caregiver-app" element={<CaregiverApp />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
