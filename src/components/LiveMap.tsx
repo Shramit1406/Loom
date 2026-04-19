@@ -30,8 +30,9 @@ const MAP_ID = "loom-map";
 function SafeZoneCircle({ zone, breached }: { zone: SafeZoneSpec; breached: boolean }) {
   const map = useMap();
   useEffect(() => {
-    if (!map || typeof google === "undefined") return;
-    const circle = new google.maps.Circle({
+    const g = (window as unknown as { google?: typeof google }).google;
+    if (!map || !g) return;
+    const circle = new g.maps.Circle({
       map,
       center: { lat: zone.lat, lng: zone.lng },
       radius: zone.radiusM,
