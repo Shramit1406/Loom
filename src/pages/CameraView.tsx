@@ -25,7 +25,7 @@ import {
 } from "@/lib/face";
 import { useLoom } from "@/context/LoomContext";
 import { broadcastSOS } from "@/lib/sos";
-import { pushSOS, publishLocation } from "@/lib/pairing";
+import { publishLocation } from "@/lib/pairing";
 import { toast } from "sonner";
 
 interface Match {
@@ -353,9 +353,12 @@ const CameraView = () => {
     } catch { /* ignore */ }
 
     await db.panicEvents.add({ id: uuid(), timestamp: new Date().toISOString(), triggeredBy: "manual", note: "From camera view", patientLocation: loc });
-    pushSOS(profile?.name ?? "Patient", loc ? { ...loc, updatedAt: new Date().toISOString() } : null);
     const r = await broadcastSOS(profile?.name ?? "Patient");
-    toast.success(r.message, { description: "Your caregiver has been alerted." });
+    if (r.ok) {
+      toast.success(r.message, { description: "Your caregiver has been alerted." });
+    } else {
+      toast.error(r.message);
+    }
   };
 
   // ── Badge config ───────────────────────────────────────────────────────────

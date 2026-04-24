@@ -66,7 +66,11 @@ const Dashboard = () => {
       triggeredBy: "manual",
     });
     const result = await broadcastSOS(profile?.name ?? "Patient");
-    toast.success(result.message, { description: "You are safe. Take a slow breath." });
+    if (result.ok) {
+      toast.success(result.message, { description: "You are safe. Take a slow breath." });
+    } else {
+      toast.error(result.message);
+    }
     setTimeout(() => {
       setPanicking(false);
       nav("/camera");
