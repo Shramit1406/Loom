@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera as CameraIcon, Upload, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
+import { toast } from "sonner";
 
 interface PhotoCaptureProps {
   onCapture: (blob: Blob) => void;
@@ -24,18 +26,27 @@ export default function PhotoCapture({ onCapture, initialUrl = null }: PhotoCapt
 
   const startCam = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: 480, height: 480 },
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: true,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Camera,
+        width: 600,
+        height: 600,
       });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+
+      if (image.webPath) {
+        const response = await fetch(image.webPath);
+        const b = await response.blob();
+        setPreviewUrl(image.webPath);
+        onCapture(b);
       }
-      setActive(true);
     } catch (e) {
       console.error(e);
-      alert("Camera access denied. You can upload a photo instead.");
+      // User cancelled is also an "error" in getPhoto, but we should only toast for real issues
+      if ((e as Error).message !== "User cancelled photos app") {
+        toast.error("Camera error", { description: "You can upload a photo instead." });
+      }
     }
   };
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Camera, Plus, Play, Heart, Users, ShieldAlert, Settings2, UserCog } from "lucide-react";
+import { Camera, Plus, Play, Heart, Users, ShieldAlert, Settings2, UserCog, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import LoomLogo from "@/components/LoomLogo";
@@ -10,6 +10,9 @@ import { useLoom } from "@/context/LoomContext";
 import { broadcastSOS } from "@/lib/sos";
 import { toast } from "sonner";
 import PairingCard from "@/components/PairingCard";
+import LiveMap from "@/components/LiveMap";
+import { distanceMeters, getShared, publishLocation, SharedState, subscribeShared } from "@/lib/pairing";
+import { startLocationWatch } from "@/lib/live-location";
 // Light shim for live data — Dexie's reactive hook isn't included to avoid extra deps.
 function usePeople(): PersonRecord[] {
   const [people, setPeople] = useState<PersonRecord[]>([]);
@@ -34,10 +37,25 @@ const Dashboard = () => {
   const { profile, loading, mode, setMode, playAnchor } = useLoom();
   const people = usePeople();
   const [panicking, setPanicking] = useState(false);
+  const [shared, setShared] = useState<SharedState>(getShared());
 
   useEffect(() => {
     if (!loading && !profile) nav("/onboarding");
   }, [loading, profile, nav]);
+
+  useEffect(() => subscribeShared(setShared), []);
+
+  useEffect(() => {
+    if (!shared.pairing?.acceptedAt) return;
+    let stop: (() => void) | undefined;
+    void startLocationWatch(
+      (location) => publishLocation("patient", location),
+      () => {}
+    ).then((cleanup) => {
+      stop = cleanup;
+    });
+    return () => stop?.();
+  }, [shared.pairing?.acceptedAt]);
 
   const triggerPanic = async () => {
     setPanicking(true);
@@ -55,6 +73,40 @@ const Dashboard = () => {
     }, 800);
   };
 
+  const handleModeToggle = (checked: boolean) => {
+    if (checked) {
+      setMode("caregiver");
+      nav("/caregiver-app");
+      return;
+    }
+
+    setMode("patient");
+  };
+
+  const markers: { id: string; lat: number; lng: number; label: string; tone: "patient" | "caregiver" | "sos" }[] = [];
+  if (shared.patientLocation) {
+    markers.push({
+      id: "patient",
+      lat: shared.patientLocation.lat,
+      lng: shared.patientLocation.lng,
+      label: profile?.name ?? shared.pairing?.patientName ?? "Patient",
+      tone: shared.sos ? "sos" : "patient",
+    });
+  }
+  if (shared.caregiverLocation) {
+    markers.push({
+      id: "caregiver",
+      lat: shared.caregiverLocation.lat,
+      lng: shared.caregiverLocation.lng,
+      label: shared.pairing?.caregiverName ?? "Caregiver",
+      tone: "caregiver",
+    });
+  }
+
+  const outsideZone =
+    !!(shared.safeZone && shared.patientLocation &&
+      distanceMeters(shared.patientLocation, shared.safeZone) > shared.safeZone.radiusM);
+
   return (
     <main className="min-h-screen bg-background pb-32">
       {/* Header */}
@@ -65,7 +117,7 @@ const Dashboard = () => {
           <span className="text-sm">Caregiver</span>
           <Switch
             checked={mode === "caregiver"}
-            onCheckedChange={(v) => setMode(v ? "caregiver" : "patient")}
+            onCheckedChange={handleModeToggle}
           />
         </div>
       </header>
@@ -123,6 +175,36 @@ const Dashboard = () => {
       <section className="container mt-6">
         <PairingCard patientName={profile?.name ?? "Patient"} />
       </section>
+
+      {shared.pairing?.acceptedAt && (
+        <section className="container mt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <MapPin className="w-5 h-5 text-primary" />
+            <h2 className="text-2xl font-semibold">Live safety map</h2>
+          </div>
+          <LiveMap markers={markers} safeZone={shared.safeZone} outsideZone={outsideZone} />
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <div className="loom-card p-4">
+              <div className="text-sm text-foreground/60">Patient</div>
+              <div className="mt-1 font-semibold">
+                {shared.patientLocation ? `${shared.patientLocation.lat.toFixed(4)}, ${shared.patientLocation.lng.toFixed(4)}` : "Waiting for location"}
+              </div>
+            </div>
+            <div className="loom-card p-4">
+              <div className="text-sm text-foreground/60">Caregiver</div>
+              <div className="mt-1 font-semibold">
+                {shared.caregiverLocation ? `${shared.caregiverLocation.lat.toFixed(4)}, ${shared.caregiverLocation.lng.toFixed(4)}` : "Not connected yet"}
+              </div>
+            </div>
+            <div className="loom-card p-4">
+              <div className="text-sm text-foreground/60">Safe zone</div>
+              <div className="mt-1 font-semibold">
+                {shared.safeZone ? `${shared.safeZone.radiusM}m radius` : "Not set"}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* People */}
       <section className="container mt-10">

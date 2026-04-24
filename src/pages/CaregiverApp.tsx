@@ -5,6 +5,17 @@ import { ArrowLeft, ShieldCheck, Link2, MapPin, BellRing, LogOut, Heart, Shield,
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import LoomLogo from "@/components/LoomLogo";
 import LiveMap from "@/components/LiveMap";
 import AudioRecorder from "@/components/AudioRecorder";
@@ -110,8 +121,7 @@ const CaregiverApp = () => {
     toast.success(`Paired with ${r.patientName}`);
   };
 
-  const unpair = () => {
-    if (!confirm("Unpair from this patient? Their location will stop being shared.")) return;
+  const confirmUnpair = () => {
     clearPairing();
     toast.success("Unpaired");
   };
@@ -405,9 +415,27 @@ const CaregiverApp = () => {
                   <Heart className="w-4 h-4 mr-2" /> Care dashboard
                 </Button>
               </Link>
-              <Button onClick={unpair} variant="ghost" className="rounded-full h-12 text-destructive hover:bg-destructive/10">
-                <LogOut className="w-4 h-4 mr-2" /> Unpair
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" className="rounded-full h-12 text-destructive hover:bg-destructive/10">
+                    <LogOut className="w-4 h-4 mr-2" /> Unpair
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-[2rem]">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Unpair from patient?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will stop location sharing and SOS updates. You'll need to re-enter a pairing code to reconnect.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={confirmUnpair} className="rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Unpair now
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
         )}

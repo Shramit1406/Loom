@@ -80,9 +80,13 @@ export default function PairingCard({ patientName }: Props) {
 
   const generate = async () => {
     setGenerating(true);
-    generatePairingCode(patientName);
+    try {
+      await generatePairingCode(patientName);
+      toast.success("Code ready", { description: "Share it with your caregiver." });
+    } catch (e) {
+      toast.error("Failed to generate code");
+    }
     setGenerating(false);
-    toast.success("Code ready", { description: "Share it with your caregiver." });
   };
 
   const copy = async () => {

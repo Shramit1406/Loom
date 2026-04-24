@@ -80,6 +80,9 @@
     font-feature-settings: "cv11", "ss01";
     -webkit-font-smoothing: antialiased;
   }
+  #root {
+    min-height: 100vh;
+  }
   h1, h2, h3, h4 {
     @apply text-foreground;
     letter-spacing: -0.02em;
@@ -107,6 +110,10 @@
 }
 
 @layer utilities {
+  .native-page {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
   .animate-pulse-soft {
     animation: pulse-soft 2.4s ease-in-out infinite;
   }
@@ -129,4 +136,26 @@
     33% { transform: translate(30px,-40px) scale(1.1); }
     66% { transform: translate(-20px,20px) scale(0.95); }
   }
+}
+
+html.native-app,
+html.native-app body,
+html.native-app #root {
+  min-height: 100%;
+}
+
+html.native-app body {
+  overscroll-behavior-y: none;
+}
+
+html.native-app .container {
+  width: 100%;
+  max-width: 100%;
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+html.native-app main {
+  padding-top: max(0.25rem, env(safe-area-inset-top));
+  padding-bottom: calc(7rem + env(safe-area-inset-bottom));
 }

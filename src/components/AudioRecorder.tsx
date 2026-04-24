@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, Square, Play, Trash2, Pause } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { VoiceRecorder } from "capacitor-voice-recorder";
+import { toast } from "sonner";
 
 interface AudioRecorderProps {
   onRecordingComplete: (blob: Blob | null) => void;
@@ -36,21 +38,8 @@ export default function AudioRecorder({
 
   const start = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const rec = new MediaRecorder(stream);
-      recRef.current = rec;
-      chunksRef.current = [];
-      rec.ondataavailable = (e) => e.data.size && chunksRef.current.push(e.data);
-      rec.onstop = () => {
-        const b = new Blob(chunksRef.current, { type: "audio/webm" });
-        if (url) URL.revokeObjectURL(url);
-        const u = URL.createObjectURL(b);
-        setBlob(b);
-        setUrl(u);
-        onRecordingComplete(b);
-        stream.getTracks().forEach((t) => t.stop());
-      };
-      rec.start();
+      const { value } = await VoiceRecorder.startRecording();
+      if (!value) throw new Error("Failed to start recording");
       setIsRecording(true);
       setElapsed(0);
       tickRef.current = window.setInterval(() => {
@@ -62,19 +51,42 @@ export default function AudioRecorder({
         });
       }, 1000);
     } catch (err) {
-      console.error("Mic permission denied", err);
-      alert("Please allow microphone access to record your voice.");
+      console.error("Mic error", err);
+      toast.error("Microphone error", { description: "Please ensure microphone permissions are granted in settings." });
     }
   };
 
-  const stop = () => {
-    recRef.current?.stop();
-    setIsRecording(false);
-    if (tickRef.current) {
-      window.clearInterval(tickRef.current);
-      tickRef.current = null;
+  const stop = async () => {
+    try {
+      const result = await VoiceRecorder.stopRecording();
+      setIsRecording(false);
+      if (tickRef.current) {
+        window.clearInterval(tickRef.current);
+        tickRef.current = null;
+      }
+
+      if (result.value) {
+        const { recordDataBase64, mimeType } = result.value;
+        const b = base64ToBlob(recordDataBase64, mimeType);
+        if (url) URL.revokeObjectURL(url);
+        const u = URL.createObjectURL(b);
+        setBlob(b);
+        setUrl(u);
+        onRecordingComplete(b);
+      }
+    } catch (err) {
+      console.error("Stop recording failed", err);
+      toast.error("Failed to save recording");
     }
   };
+
+  function base64ToBlob(base64: string, type: string) {
+    const bin = atob(base64);
+    const len = bin.length;
+    const array = new Uint8Array(len);
+    for (let i = 0; i < len; i++) array[i] = bin.charCodeAt(i);
+    return new Blob([array], { type });
+  }
 
   const togglePlay = () => {
     if (!url) return;

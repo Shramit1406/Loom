@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Download, Mic, Trash2, ShieldAlert, Clock, Pencil } from "lucide-react";
+import { ArrowLeft, Download, Mic, Trash2, ShieldAlert, Clock, Pencil, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import LoomLogo from "@/components/LoomLogo";
 import AudioRecorder from "@/components/AudioRecorder";
+import LiveMap from "@/components/LiveMap";
 import { db, PanicEvent, PersonRecord, PROFILE_ID } from "@/lib/db";
 import { useLoom } from "@/context/LoomContext";
 import { toast } from "sonner";
+import { distanceMeters, getShared, publishLocation, SharedState, subscribeShared } from "@/lib/pairing";
+import { startLocationWatch } from "@/lib/live-location";
 
 const Caregiver = () => {
   const nav = useNavigate();
@@ -19,6 +22,7 @@ const Caregiver = () => {
   const [editName, setEditName] = useState("");
   const [editRel, setEditRel] = useState("");
   const [reRecording, setReRecording] = useState(false);
+  const [shared, setShared] = useState<SharedState>(getShared());
 
   const reload = async () => {
     setPeople(await db.people.orderBy("createdAt").reverse().toArray());
@@ -32,6 +36,20 @@ const Caregiver = () => {
     }
     reload();
   }, [mode, nav]);
+
+  useEffect(() => subscribeShared(setShared), []);
+
+  useEffect(() => {
+    if (mode !== "caregiver") return;
+    let stop: (() => void) | undefined;
+    void startLocationWatch(
+      (location) => publishLocation("caregiver", location),
+      () => {}
+    ).then((cleanup) => {
+      stop = cleanup;
+    });
+    return () => stop?.();
+  }, [mode]);
 
   const startEdit = (p: PersonRecord) => {
     setEditingId(p.id);
@@ -91,6 +109,30 @@ const Caregiver = () => {
     toast.success("Backup downloaded");
   };
 
+  const markers: { id: string; lat: number; lng: number; label: string; tone: "patient" | "caregiver" | "sos" }[] = [];
+  if (shared.patientLocation) {
+    markers.push({
+      id: "patient",
+      lat: shared.patientLocation.lat,
+      lng: shared.patientLocation.lng,
+      label: shared.pairing?.patientName ?? profile?.name ?? "Patient",
+      tone: shared.sos ? "sos" : "patient",
+    });
+  }
+  if (shared.caregiverLocation) {
+    markers.push({
+      id: "caregiver",
+      lat: shared.caregiverLocation.lat,
+      lng: shared.caregiverLocation.lng,
+      label: shared.pairing?.caregiverName ?? "Caregiver",
+      tone: "caregiver",
+    });
+  }
+
+  const outsideZone =
+    !!(shared.safeZone && shared.patientLocation &&
+      distanceMeters(shared.patientLocation, shared.safeZone) > shared.safeZone.radiusM);
+
   return (
     <main className="min-h-screen bg-background pb-32">
       <header className="container pt-6 pb-4 flex items-center justify-between">
@@ -106,6 +148,20 @@ const Caregiver = () => {
         </div>
         <h1 className="text-3xl md:text-4xl font-semibold tracking-tight mt-3">Caregiver dashboard</h1>
         <p className="text-foreground/70 mt-2">Manage {profile?.name ?? "the patient"}'s memory anchor and people.</p>
+
+        {shared.pairing?.acceptedAt && (
+          <motion.section
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="loom-card mt-8"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <MapPin className="w-5 h-5 text-primary" />
+              <h2 className="text-xl font-semibold">Live map</h2>
+            </div>
+            <LiveMap markers={markers} safeZone={shared.safeZone} outsideZone={outsideZone} />
+          </motion.section>
+        )}
 
         {/* Panic history */}
         <motion.section

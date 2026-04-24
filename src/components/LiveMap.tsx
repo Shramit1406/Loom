@@ -80,10 +80,10 @@ export default function LiveMap({ markers, center, zoom = 14, safeZone, outsideZ
   const c = center ?? markers[0] ?? (safeZone ? { lat: safeZone.lat, lng: safeZone.lng } : { lat: 37.7749, lng: -122.4194 });
 
   return (
-    <div className="rounded-3xl overflow-hidden shadow-card h-[420px] bg-muted">
+    <div className="rounded-3xl overflow-hidden shadow-card h-[320px] sm:h-[420px] bg-muted">
       <APIProvider apiKey={KEY}>
         <Map
-          defaultCenter={c}
+          center={c}
           defaultZoom={zoom}
           mapId={MAP_ID}
           gestureHandling="greedy"
